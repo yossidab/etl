@@ -1,3 +1,4 @@
 node_modules
 dataProcessor.log
 server.log
+server-events.jsonl

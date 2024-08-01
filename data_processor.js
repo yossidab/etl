@@ -26,7 +26,6 @@ const POOL = new Pool({
   password: '12344321',
   port: 5432,
 });
-const BATCH_SIZE = 10000;
 const EVENT_FILE = 'server-events.jsonl';
 
 // Check if the file is locked
@@ -35,7 +34,6 @@ async function isFileLocked(filePath) {
     const isLocked = await lockfile.check(filePath);
     return isLocked;
   } catch (err) {
-    console.error('Error checking file lock:', err);
     return false;
   }
 }
@@ -45,21 +43,21 @@ async function processBatch(fileName) {
   let lines = [];
   try {
     if (await isFileLocked(fileName)) {
-      setTimeout(() => processBatch(fileName, BATCH_SIZE), 6000);
+      setTimeout(() => processBatch(fileName), 6000);
       return;
     } else {
       try {
         await lockfile.lock(fileName);
         logger.debug(`Locked file: ${fileName}`);
       } catch {
-        setTimeout(() => processBatch(fileName, BATCH_SIZE), 6000);
+        setTimeout(() => processBatch(fileName), 6000);
         return;
       }
     }
 
     // Read the file line by line until the batch size is reached or the file ends
     const fileData = fs.readFileSync(fileName, 'utf-8');
-    lines = fileData.split('\n').filter(Boolean).slice(0, BATCH_SIZE);
+    lines = fileData.split('\n').filter(Boolean);
 
     if (lines.length === 0) {
       logger.debug('No lines to process.');
@@ -69,7 +67,7 @@ async function processBatch(fileName) {
     }
 
     // Write the remaining lines back to the file
-    const remainingLines = fileData.split('\n').filter(Boolean).slice(BATCH_SIZE);
+    const remainingLines = fileData.split('\n').filter(Boolean);
     fs.writeFileSync(fileName, remainingLines.join('\n') + '\n');
 
     // Release the file lock
@@ -135,23 +133,24 @@ async function processBatch(fileName) {
   }
 
   // Process the next batch
-  setImmediate(() => processBatch(fileName, BATCH_SIZE));
+  setImmediate(() => processBatch(fileName));
 };
 
 // Function to watch the file for changes
-function watchFile(fileName, BATCH_SIZE = 1000) {
+function watchFile(fileName) {
+  logger.info('The data processor is running');
   fs.watch(fileName, (eventType) => {
     if (eventType === 'change') {
       logger.debug(`File changed: ${fileName}`);
-      processBatch(fileName, BATCH_SIZE);
+      processBatch(fileName);
     }
   });
 
   // Initial processing of the file
-  processBatch(fileName, BATCH_SIZE);
+  processBatch(fileName);
 };
 
-watchFile(EVENT_FILE, BATCH_SIZE);
+watchFile(EVENT_FILE);
 
 // Gracefully close the database connection on process exit
 process.on('SIGINT', () => {

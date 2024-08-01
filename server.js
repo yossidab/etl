@@ -64,13 +64,11 @@ APP.use((req, res, next) => {
   }
 });
 
-// Check if the file is locked
 async function isFileLocked(filePath) {
   try {
     const isLocked = await lockfile.check(filePath);
     return isLocked;
   } catch (err) {
-    console.error('Error checking file lock:', err);
     return false;
   }
 }
@@ -80,7 +78,6 @@ async function flushBuffer(){
   if (BUFFER.length > 0) {
     const data = BUFFER.join('\n') + '\n';
 
-    // lock the file before writing
     if (await isFileLocked(EVENT_FILE)) {
       setImmediate(() => flushBuffer(), 1000);
       return;
@@ -106,7 +103,6 @@ async function flushBuffer(){
   }
 };
 
-// Set an interval to flush the buffer at regular intervals
 setInterval(flushBuffer, FLASH_INTERVAL);
 
 // POST /liveEvent endpoint
@@ -144,13 +140,11 @@ APP.get('/userEvents', async (req, res) => {
   }
 });
 
-// Start the server
 APP.listen(PORT,async () => {
   await createJSONLFile(SERVER_EVENTS_PATH);
   LOGGER.info(`Server is running on http://localhost:${PORT}`);
 });
 
-// Gracefully close the database connection on server shutdown
 process.on('SIGINT', handleExit);
 process.on('SIGTERM', handleExit);
 process.on('SIGHUP', handleExit);
