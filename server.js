@@ -4,6 +4,8 @@ const fs = require('fs');
 const winston = require('winston');
 const { Pool } = require('pg');
 const lockfile = require('proper-lockfile');
+const path = require('path');
+
 
 const APP = express();
 const PORT = 8000;
@@ -19,22 +21,21 @@ const POOL = new Pool({
   host: 'localhost',
   database: 'etl_db',
   password: '12344321',
-  port: 5432, 
+  port: 5432,
 });
 
-POOL.query(
-  `CREATE TABLE IF NOT EXISTS users_revenue (
-    user_id TEXT PRIMARY KEY,
-    revenue INTEGER DEFAULT 0
-  )`,
-  (err) => {
-    if (err) {
-      LOGGER.error(`Error creating table: ${err.message}`);
-    } else {
-      LOGGER.info('Database and table initialized.');
-    }
+// Function to execute the SQL script from the file
+const executeSqlScript = async (filePath) => {
+  try {
+    const sql = fs.readFileSync(filePath, 'utf8');
+    await POOL.query(sql);
+    LOGGER.info('Database and table initialized.');
+  } catch (err) {
+    LOGGER.error(`Error creating table: ${err.message}`);
   }
-);
+};
+// Execute the SQL script to create the table
+executeSqlScript(path.join(__dirname, 'db.sql'));
 
 const LOGGER = winston.createLogger({
   level: 'info',
@@ -74,7 +75,7 @@ async function isFileLocked(filePath) {
 }
 
 // Function to flush the buffer to the file
-async function flushBuffer(){
+async function flushBuffer() {
   if (BUFFER.length > 0) {
     const data = BUFFER.join('\n') + '\n';
 
@@ -108,13 +109,13 @@ setInterval(flushBuffer, FLASH_INTERVAL);
 // POST /liveEvent endpoint
 APP.post('/liveEvent', (req, res) => {
   const event = req.body;
-  if(event.userId && event.name && event.value) {
+  if (event.userId && event.name && event.value) {
     BUFFER.push(JSON.stringify(event));
 
     if (BUFFER.length >= BUFFER_SIZE) {
       flushBuffer();
     }
-  
+
     res.status(200).send('Event received and buffered.');
   } else {
     res.status(422).send('Event missing userID/name/value');
@@ -140,7 +141,7 @@ APP.get('/userEvents', async (req, res) => {
   }
 });
 
-APP.listen(PORT,async () => {
+APP.listen(PORT, async () => {
   await createJSONLFile(SERVER_EVENTS_PATH);
   LOGGER.info(`Server is running on http://localhost:${PORT}`);
 });
@@ -159,24 +160,24 @@ function handleExit() {
     }
     LOGGER.info('Closed the database connection.');
     process.exit(0);
-  }); 
+  });
 }
 
 function createJSONLFile(filePath) {
   return new Promise((resolve, reject) => {
-      fs.writeFile(filePath, '', { flag: 'wx', mode: 0o666 }, (err) => {
-          if (err) {
-              if (err.code === 'EEXIST') {
-                  console.log('File already exists');
-                  resolve();
-              } else {
-                  console.error('Error creating JSONL file:', err);
-                  reject(err);
-              }
-          } else {
-              console.log('New JSONL file created successfully with appropriate permissions');
-              resolve();
-          }
-      });
+    fs.writeFile(filePath, '', { flag: 'wx', mode: 0o666 }, (err) => {
+      if (err) {
+        if (err.code === 'EEXIST') {
+          console.log('File already exists');
+          resolve();
+        } else {
+          console.error('Error creating JSONL file:', err);
+          reject(err);
+        }
+      } else {
+        console.log('New JSONL file created successfully with appropriate permissions');
+        resolve();
+      }
+    });
   });
 }
