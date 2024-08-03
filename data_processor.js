@@ -125,7 +125,7 @@ async function processBatch(fileName) {
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
-      LOGGER.error(`Error updating/inserting revenue for users: ${err.message}`);
+      LOGGER.info(`Error updating/inserting revenue for users: ${err.message}`);
       // Re-write the lines to the file if there's an error
       fs.appendFile(fileName, lines.join('\n') + '\n' + remainingLines.join('\n') + '\n', (err) => {
         if (err) {
